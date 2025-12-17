@@ -1,65 +1,88 @@
+"""
+DDI Sentiment Analyzer - RoBERTuito V2.0
+Aplicación Streamlit para análisis de sentimiento en español
+Modelo: ejerez003/robertuito-guatemala-v2.0
+"""
+
 import streamlit as st
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from pysentimiento.preprocessing import preprocess_tweet
 import pandas as pd
 import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
-from pysentimiento.preprocessing import preprocess_tweet
-import plotly.express as px
-import plotly.graph_objects as go
-from sklearn.metrics import accuracy_score, precision_score, recall_score
-import os
-from openai import OpenAI
+from datetime import datetime
+import io
 
-# ============================================================================
-# CONFIGURACIÓN DE PÁGINA
-# ============================================================================
-
+# ==================== CONFIGURACIÓN ====================
 st.set_page_config(
-    page_title="DDI Sentiment Analyzer V2.0",
+    page_title="DDI Sentiment Analyzer",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# ============================================================================
-# FUNCIONES AUXILIARES
-# ============================================================================
-
+# ==================== CARGA DEL MODELO ====================
 @st.cache_resource
-def cargar_modelo_huggingface(model_name="ejerez003/robertuito-guatemala-v2.0"):
-    """Carga el modelo RoBERTuito V2 desde Hugging Face Hub"""
-    try:
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = AutoModelForSequenceClassification.from_pretrained(model_name)
-        classifier = pipeline('text-classification', model=model, tokenizer=tokenizer, device=-1)
-        return classifier, tokenizer
-    except Exception as e:
-        st.error(f"Error al cargar modelo: {e}")
-        return None, None
+def load_model():
+    """
+    Carga el modelo RoBERTuito V2.0 desde Hugging Face Hub
+    Usa @st.cache_resource para cargar solo una vez y cachear
+    """
+    with st.spinner("🔄 Cargando modelo RoBERTuito V2.0 desde Hugging Face Hub..."):
+        try:
+            model_name = "ejerez003/robertuito-guatemala-v2.0"
+            
+            # Cargar tokenizer y modelo
+            tokenizer = AutoTokenizer.from_pretrained(model_name)
+            model = AutoModelForSequenceClassification.from_pretrained(model_name)
+            
+            # Configurar para CPU
+            model.eval()
+            
+            st.success("✅ Modelo cargado exitosamente")
+            return tokenizer, model
+            
+        except Exception as e:
+            st.error(f"❌ Error al cargar el modelo: {str(e)}")
+            st.stop()
 
-@st.cache_resource
-def cargar_modelo_local(model_path):
-    """Carga el modelo RoBERTuito V2 desde directorio local (solo para uso local)"""
-    try:
-        tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)
-        model = AutoModelForSequenceClassification.from_pretrained(model_path, local_files_only=True)
-        classifier = pipeline('text-classification', model=model, tokenizer=tokenizer, device=-1)
-        return classifier, tokenizer
-    except Exception as e:
-        st.error(f"Error al cargar modelo local: {e}")
-        return None, None
-
-def predecir_sentimiento_v2(textos, classifier, tokenizer, batch_size=32):
-    """Predice sentimiento con Modelo V2"""
-    resultados = []
-    progress_bar = st.progress(0)
+# ==================== FUNCIONES DE PREDICCIÓN ====================
+def predict_sentiment_batch(texts, tokenizer, model, batch_size=32):
+    """
+    Procesa textos en batches con preprocesamiento pysentimiento
     
-    for i in range(0, len(textos), batch_size):
-        batch = textos[i:i+batch_size]
-        batch_preprocesado = [preprocess_tweet(str(texto)) for texto in batch]
+    Args:
+        texts: Lista de textos a analizar
+        tokenizer: Tokenizer del modelo
+        model: Modelo de clasificación
+        batch_size: Tamaño del batch (default: 32)
+    
+    Returns:
+        Lista de diccionarios con 'label' y 'score'
+    """
+    all_predictions = []
+    
+    # Crear progress bar
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    total_batches = (len(texts) + batch_size - 1) // batch_size
+    
+    for batch_idx, i in enumerate(range(0, len(texts), batch_size)):
+        # Actualizar progress bar
+        progress = (batch_idx + 1) / total_batches
+        progress_bar.progress(progress)
+        status_text.text(f"Procesando batch {batch_idx + 1}/{total_batches}...")
         
-        # Tokenizar con truncación
+        # Extraer batch
+        batch = texts[i:i+batch_size]
+        
+        # ⚠️ CRÍTICO: Preprocesar con pysentimiento
+        # Esto normaliza URLs, menciones, emojis, etc.
+        batch_preprocessed = [preprocess_tweet(text) for text in batch]
+        
+        # Tokenizar
         inputs = tokenizer(
-            batch_preprocesado,
+            batch_preprocessed,
             truncation=True,
             max_length=128,
             padding=True,
@@ -68,322 +91,240 @@ def predecir_sentimiento_v2(textos, classifier, tokenizer, batch_size=32):
         
         # Predicción
         with torch.no_grad():
-            predictions = classifier(batch_preprocesado)
+            outputs = model(**inputs)
+            logits = outputs.logits
+            predictions = torch.nn.functional.softmax(logits, dim=-1)
+            predicted_class = torch.argmax(predictions, dim=-1)
+            confidence = torch.max(predictions, dim=-1)[0]
         
-        resultados.extend(predictions)
-        progress_bar.progress(min((i + batch_size) / len(textos), 1.0))
+        # Extraer resultados
+        for pred_id, conf in zip(predicted_class, confidence):
+            label = model.config.id2label[pred_id.item()]
+            all_predictions.append({
+                'label': label,
+                'score': conf.item()
+            })
     
-    return resultados
-
-def generar_verdad_absoluta(textos, api_key, modelo="gpt-3.5-turbo", max_samples=None):
-    """Genera verdad absoluta con OpenAI"""
-    client = OpenAI(api_key=api_key)
+    # Limpiar progress bar
+    progress_bar.empty()
+    status_text.empty()
     
-    SYSTEM_PROMPT = """Eres un experto en análisis de sentimientos en español guatemalteco.
-Clasifica cada texto en: positivo, negativo o neutro.
-Considera sarcasmo, jerga guatemalteca y contexto empresarial.
-Responde SOLO con una palabra: positivo, negativo o neutro"""
-    
-    if max_samples:
-        textos = textos[:max_samples]
-    
-    resultados = []
-    progress_bar = st.progress(0)
-    
-    for idx, texto in enumerate(textos):
-        try:
-            response = client.chat.completions.create(
-                model=modelo,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": f"Texto: {texto}"}
-                ],
-                max_tokens=10,
-                temperature=0.3
-            )
-            label = response.choices[0].message.content.strip().lower()
-            resultados.append(label)
-        except Exception as e:
-            st.warning(f"Error en texto {idx}: {e}")
-            resultados.append("neutro")  # Default
-        
-        progress_bar.progress((idx + 1) / len(textos))
-    
-    return resultados
+    return all_predictions
 
-def calcular_metricas(y_true, y_pred, nombre_modelo):
-    """Calcula métricas de clasificación"""
-    acc = accuracy_score(y_true, y_pred)
-    prec = precision_score(y_true, y_pred, average='macro', zero_division=0)
-    rec = recall_score(y_true, y_pred, average='macro', zero_division=0)
-    f1 = 2 * (prec * rec) / (prec + rec) if (prec + rec) > 0 else 0
-    
-    return {
-        'modelo': nombre_modelo,
-        'accuracy': acc,
-        'precision': prec,
-        'recall': rec,
-        'f1': f1
-    }
-
-# ============================================================================
-# SIDEBAR: CONFIGURACIÓN
-# ============================================================================
-
-st.sidebar.header("⚙️ Configuración")
-
-# 1. Configuración del modelo
-st.sidebar.subheader("1️⃣ Modelo RoBERTuito V2")
-usar_modelo_local = st.sidebar.checkbox("Usar modelo local (solo para desarrollo)", value=False)
-
-if usar_modelo_local:
-    model_path = st.sidebar.text_input(
-        "Ruta del modelo local:",
-        value="./robertuito-guatemala-v2.0",
-        help="Solo para uso local"
-    )
-else:
-    st.sidebar.info("📡 Usando modelo desde Hugging Face Hub")
-    model_path = "ejerez003/robertuito-guatemala-v2.0"
-
-# 2. API Key OpenAI (opcional)
-st.sidebar.subheader("2️⃣ Verdad Absoluta (Opcional)")
-usar_verdad = st.sidebar.checkbox("Generar verdad absoluta con LLM", value=False)
-openai_key = ""
-if usar_verdad:
-    # Intentar cargar desde secrets de Streamlit Cloud
+# ==================== PROCESAMIENTO DE ARCHIVO ====================
+def process_file(uploaded_file, tokenizer, model):
+    """
+    Procesa archivo CSV/XLSX y retorna DataFrame con predicciones
+    """
     try:
-        openai_key = st.secrets["OPENAI_API_KEY"]
-        st.sidebar.success("✅ API Key cargada desde secrets")
-    except:
-        openai_key = st.sidebar.text_input(
-            "API Key OpenAI:",
-            type="password",
-            help="Necesaria para generar verdad absoluta"
-        )
-    
-    max_samples_verdad = st.sidebar.number_input(
-        "Máximo de muestras para verdad absoluta:",
-        min_value=10,
-        max_value=5000,
-        value=100,
-        help="Limita el costo de OpenAI"
-    )
-
-# 3. Opciones de procesamiento
-st.sidebar.subheader("3️⃣ Opciones")
-batch_size = st.sidebar.slider("Batch size:", 8, 64, 32)
-
-# ============================================================================
-# MAIN: INTERFAZ PRINCIPAL
-# ============================================================================
-
-st.title("🎯 DDI Sentiment Analyzer V2.0")
-st.markdown("**Análisis de Sentimiento con RoBERTuito V2 Fine-tuned para Guatemala**")
-st.markdown("---")
-
-# PASO 1: Cargar modelo
-st.header("📦 Paso 1: Cargar Modelo")
-if st.button("🔄 Cargar Modelo RoBERTuito V2"):
-    with st.spinner("Cargando modelo..."):
-        if usar_modelo_local:
-            classifier, tokenizer = cargar_modelo_local(model_path)
+        # Leer archivo según extensión
+        if uploaded_file.name.endswith('.csv'):
+            df = pd.read_csv(uploaded_file)
+        elif uploaded_file.name.endswith(('.xlsx', '.xls')):
+            df = pd.read_excel(uploaded_file)
         else:
-            classifier, tokenizer = cargar_modelo_huggingface(model_path)
+            st.error("❌ Formato no soportado. Use CSV o Excel (.xlsx, .xls)")
+            return None
         
-        if classifier:
-            st.session_state['classifier'] = classifier
-            st.session_state['tokenizer'] = tokenizer
-            st.success("✅ Modelo cargado correctamente")
-        else:
-            st.error("❌ Error al cargar modelo.")
+        # Validar columna de texto
+        text_columns = ['texto', 'text', 'content', 'mensaje', 'comment', 'comentario']
+        text_col = None
+        
+        for col in text_columns:
+            if col.lower() in [c.lower() for c in df.columns]:
+                text_col = [c for c in df.columns if c.lower() == col.lower()][0]
+                break
+        
+        if text_col is None:
+            st.error(f"❌ No se encontró columna de texto. Columnas esperadas: {', '.join(text_columns)}")
+            st.info(f"📋 Columnas encontradas: {', '.join(df.columns)}")
+            return None
+        
+        # Extraer textos
+        texts = df[text_col].fillna("").astype(str).tolist()
+        
+        if len(texts) == 0:
+            st.error("❌ No se encontraron textos para analizar")
+            return None
+        
+        # Realizar predicciones
+        st.info(f"🔄 Analizando {len(texts)} textos...")
+        predictions = predict_sentiment_batch(texts, tokenizer, model)
+        
+        # Agregar predicciones al DataFrame
+        df['sentiment_v2'] = [pred['label'] for pred in predictions]
+        df['confidence_v2'] = [pred['score'] for pred in predictions]
+        
+        return df
+        
+    except Exception as e:
+        st.error(f"❌ Error al procesar archivo: {str(e)}")
+        return None
 
-# PASO 2: Upload archivo
-st.header("📂 Paso 2: Cargar Archivo de Datos")
-uploaded_file = st.file_uploader(
-    "Sube tu archivo CSV o XLSX",
-    type=['csv', 'xlsx'],
-    help="Debe contener columnas: 'ID', 'texto', 'sentiment' (opcional)"
-)
-
-if uploaded_file:
-    # Cargar datos
-    if uploaded_file.name.endswith('.csv'):
-        df = pd.read_csv(uploaded_file)
-    else:
-        df = pd.read_excel(uploaded_file)
+# ==================== VISUALIZACIÓN DE RESULTADOS ====================
+def show_results(df):
+    """
+    Muestra resultados y estadísticas
+    """
+    st.success(f"✅ Análisis completado: {len(df)} textos procesados")
     
-    # Validar columnas
-    if 'texto' not in df.columns and 'content' in df.columns:
-        df.rename(columns={'content': 'texto'}, inplace=True)
+    # Métricas principales
+    col1, col2, col3, col4 = st.columns(4)
     
-    if 'sentiment' in df.columns:
-        df.rename(columns={'sentiment': 'sentiment_plataforma'}, inplace=True)
-        tiene_sentimiento_previo = True
-    else:
-        tiene_sentimiento_previo = False
+    sentiment_counts = df['sentiment_v2'].value_counts()
     
-    st.success(f"✅ Archivo cargado: {len(df)} registros")
-    
-    # Vista previa
-    with st.expander("🔍 Vista previa (primeras 10 filas)"):
-        st.dataframe(df.head(10))
-    
-    # Información
-    col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("Total registros", len(df))
+        st.metric(
+            "Total Textos",
+            len(df)
+        )
+    
     with col2:
-        st.metric("Columnas", len(df.columns))
+        pos_count = sentiment_counts.get('POS', 0)
+        pos_pct = (pos_count / len(df)) * 100
+        st.metric(
+            "Positivos",
+            f"{pos_count}",
+            f"{pos_pct:.1f}%"
+        )
+    
     with col3:
-        if tiene_sentimiento_previo:
-            st.metric("Sentimiento previo", "✅ Detectado")
-        else:
-            st.metric("Sentimiento previo", "❌ No detectado")
-    
-    # PASO 3: Procesar
-    st.header("🚀 Paso 3: Analizar Sentimiento")
-    
-    if st.button("▶️ INICIAR ANÁLISIS", type="primary"):
-        if 'classifier' not in st.session_state:
-            st.error("⚠️ Primero carga el modelo en el Paso 1")
-        else:
-            # Predicción Modelo V2
-            st.subheader("🤖 Procesando con Modelo V2...")
-            textos = df['texto'].astype(str).tolist()
-            
-            predicciones_v2 = predecir_sentimiento_v2(
-                textos,
-                st.session_state['classifier'],
-                st.session_state['tokenizer'],
-                batch_size
-            )
-            
-            df['modelo_v2_label'] = [p['label'].lower() for p in predicciones_v2]
-            df['modelo_v2_score'] = [p['score'] for p in predicciones_v2]
-            
-            st.success("✅ Predicciones Modelo V2 completadas")
-            
-            # Verdad Absoluta (opcional)
-            if usar_verdad and openai_key:
-                st.subheader("🧠 Generando Verdad Absoluta con LLM...")
-                df['verdad_absoluta'] = generar_verdad_absoluta(
-                    textos,
-                    openai_key,
-                    max_samples=max_samples_verdad
-                )
-                st.success("✅ Verdad absoluta generada")
-            
-            # Guardar en session state
-            st.session_state['df_resultados'] = df
-            st.success("🎉 Análisis completado")
-
-# PASO 4: Resultados
-if 'df_resultados' in st.session_state:
-    st.header("📊 Paso 4: Resultados y Comparación")
-    df_res = st.session_state['df_resultados']
-    
-    # Tabs para organizar resultados
-    tab1, tab2, tab3 = st.tabs(["📈 Métricas", "📋 Datos", "📥 Descargar"])
-    
-    with tab1:
-        st.subheader("Comparación de Modelos")
-        
-        # Calcular métricas si hay verdad absoluta
-        if 'verdad_absoluta' in df_res.columns:
-            metricas = []
-            
-            if 'sentiment_plataforma' in df_res.columns:
-                metricas.append(calcular_metricas(
-                    df_res['verdad_absoluta'],
-                    df_res['sentiment_plataforma'],
-                    'Plataforma Original'
-                ))
-            
-            metricas.append(calcular_metricas(
-                df_res['verdad_absoluta'],
-                df_res['modelo_v2_label'],
-                'Modelo V2 (RoBERTuito)'
-            ))
-            
-            # Mostrar métricas
-            df_metricas = pd.DataFrame(metricas)
-            
-            # Cards de métricas
-            cols = st.columns(len(metricas))
-            for idx, row in df_metricas.iterrows():
-                with cols[idx]:
-                    st.metric(
-                        row['modelo'],
-                        f"{row['accuracy']:.1%}",
-                        delta=f"F1: {row['f1']:.1%}"
-                    )
-            
-            # Gráfico comparativo
-            fig = px.bar(
-                df_metricas,
-                x='modelo',
-                y=['accuracy', 'precision', 'recall', 'f1'],
-                barmode='group',
-                title='Comparación de Métricas',
-                labels={'value': 'Score', 'variable': 'Métrica'}
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        
-        # Distribución de sentimientos
-        st.subheader("Distribución de Sentimientos")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if 'sentiment_plataforma' in df_res.columns:
-                fig1 = px.pie(
-                    df_res,
-                    names='sentiment_plataforma',
-                    title='Plataforma Original'
-                )
-                st.plotly_chart(fig1, use_container_width=True)
-        
-        with col2:
-            fig2 = px.pie(
-                df_res,
-                names='modelo_v2_label',
-                title='Modelo V2'
-            )
-            st.plotly_chart(fig2, use_container_width=True)
-    
-    with tab2:
-        st.subheader("Tabla de Resultados")
-        st.dataframe(df_res, use_container_width=True)
-    
-    with tab3:
-        st.subheader("Descargar Resultados")
-        
-        # CSV
-        csv = df_res.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Descargar CSV",
-            data=csv,
-            file_name="resultados_sentimiento_ddi.csv",
-            mime="text/csv"
+        neu_count = sentiment_counts.get('NEU', 0)
+        neu_pct = (neu_count / len(df)) * 100
+        st.metric(
+            "Neutrales",
+            f"{neu_count}",
+            f"{neu_pct:.1f}%"
         )
-        
-        # Excel
-        from io import BytesIO
-        buffer = BytesIO()
-        df_res.to_excel(buffer, index=False)
-        buffer.seek(0)
-        
-        st.download_button(
-            label="📥 Descargar Excel",
-            data=buffer,
-            file_name="resultados_sentimiento_ddi.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    
+    with col4:
+        neg_count = sentiment_counts.get('NEG', 0)
+        neg_pct = (neg_count / len(df)) * 100
+        st.metric(
+            "Negativos",
+            f"{neg_count}",
+            f"{neg_pct:.1f}%"
         )
+    
+    # Distribución
+    st.subheader("📊 Distribución de Sentimientos")
+    st.bar_chart(sentiment_counts)
+    
+    # Tabla de resultados
+    st.subheader("📋 Resultados Detallados")
+    
+    # Mostrar primeros 100 registros por defecto
+    display_df = df.head(100)
+    st.dataframe(
+        display_df,
+        use_container_width=True,
+        height=400
+    )
+    
+    if len(df) > 100:
+        st.info(f"ℹ️ Mostrando primeros 100 de {len(df)} registros. Descarga el archivo completo abajo.")
 
-# ============================================================================
-# FOOTER
-# ============================================================================
+# ==================== INTERFAZ PRINCIPAL ====================
+def main():
+    """
+    Función principal de la aplicación
+    """
+    # Header
+    st.title("🎯 DDI Sentiment Analyzer")
+    st.markdown("### Análisis de Sentimiento con RoBERTuito V2.0")
+    st.markdown("---")
+    
+    # Sidebar con información
+    with st.sidebar:
+        st.header("ℹ️ Información")
+        st.markdown("""
+        **Modelo:** RoBERTuito V2.0  
+        **Precisión:** 82.65%  
+        **Idioma:** Español (LATAM)
+        
+        **Categorías:**
+        - 🟢 POS: Positivo
+        - 🟡 NEU: Neutral
+        - 🔴 NEG: Negativo
+        
+        **Formato de archivo:**
+        - CSV (.csv)
+        - Excel (.xlsx, .xls)
+        
+        **Columna de texto requerida:**
+        - texto / text / content
+        - mensaje / comment / comentario
+        """)
+        
+        st.markdown("---")
+        st.markdown("**Desarrollado por:** JLA Consulting Group")
+        st.markdown("**Cliente:** DDI Guatemala")
+    
+    # Cargar modelo
+    tokenizer, model = load_model()
+    
+    # Upload file
+    st.header("📤 Cargar Archivo")
+    uploaded_file = st.file_uploader(
+        "Selecciona un archivo CSV o Excel",
+        type=['csv', 'xlsx', 'xls'],
+        help="El archivo debe contener una columna con textos a analizar"
+    )
+    
+    if uploaded_file is not None:
+        # Mostrar información del archivo
+        st.info(f"📄 Archivo cargado: {uploaded_file.name} ({uploaded_file.size / 1024:.1f} KB)")
+        
+        # Procesar archivo
+        with st.spinner("🔄 Procesando archivo..."):
+            df_results = process_file(uploaded_file, tokenizer, model)
+        
+        if df_results is not None:
+            # Mostrar resultados
+            show_results(df_results)
+            
+            # Botón de descarga
+            st.subheader("💾 Descargar Resultados")
+            
+            # Generar nombre de archivo con timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            output_filename = f"sentiment_analysis_{timestamp}.xlsx"
+            
+            # Convertir a Excel en memoria
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df_results.to_excel(writer, index=False, sheet_name='Resultados')
+            output.seek(0)
+            
+            st.download_button(
+                label="📥 Descargar Excel con Resultados",
+                data=output,
+                file_name=output_filename,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+    
+    else:
+        # Instrucciones iniciales
+        st.info("""
+        👆 **Para comenzar:**
+        1. Carga un archivo CSV o Excel
+        2. Asegúrate que tenga una columna de texto llamada: `texto`, `text`, `content`, `mensaje`, `comment` o `comentario`
+        3. El análisis comenzará automáticamente
+        4. Descarga los resultados cuando estén listos
+        """)
+        
+        # Ejemplo de formato
+        with st.expander("📋 Ver ejemplo de formato esperado"):
+            example_df = pd.DataFrame({
+                'texto': [
+                    'Me encanta este producto, es excelente!',
+                    'No funciona bien, muy decepcionante',
+                    'Es un producto normal, nada especial'
+                ],
+                'fecha': ['2025-01-01', '2025-01-02', '2025-01-03']
+            })
+            st.dataframe(example_df)
 
-st.markdown("---")
-st.markdown("**DDI Sentiment Analyzer V2.0** | Powered by JLA Consulting | RoBERTuito Fine-tuned")
+# ==================== EJECUCIÓN ====================
+if __name__ == "__main__":
+    main()
