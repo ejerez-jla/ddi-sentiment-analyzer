@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints
+
+# Modelo (muy pesado)
+robertuito-guatemala-v2.0/
+*.zip
+*.bin
+*.safetensors
+
+# Datos
+*.csv
+*.xlsx
+*.xls
+
+# Secrets
+.env
+.streamlit/secrets.toml
+
+# OS
+.DS_Store
+Thumbs.db
