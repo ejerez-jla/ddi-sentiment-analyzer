@@ -1,11 +1,7 @@
-# Core ML dependencies
-# torch será instalado automáticamente por transformers
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
 transformers==4.30.2
 pysentimiento==0.7.0
-
-# Data processing
 pandas==2.0.3
 openpyxl==3.1.2
-
-# Streamlit
 streamlit==1.28.0
