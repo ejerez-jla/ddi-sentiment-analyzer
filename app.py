@@ -41,7 +41,11 @@ def main():
         st.divider()
         st.subheader("Configuración")
         use_sentiment = st.checkbox("Analizar Sentimiento", value=True)
-        use_topics = st.checkbox("Detectar Tópicos", value=True)
+        use_topics = st.checkbox("Detectar Tópicos", value=False, disabled=True, 
+                                  help="⚠️ Deshabilitado temporalmente: El modelo requiere >1GB de RAM (límite de Streamlit Free Tier)")
+        
+        if use_topics:
+            st.warning("⚠️ La detección de tópicos requiere recursos adicionales. Considera usar solo análisis de sentimiento.")
         
         st.divider()
         st.caption("v1.0.0 | Powered by RoBERTuito & ZeroShot")
