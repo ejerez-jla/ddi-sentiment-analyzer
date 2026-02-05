@@ -5,6 +5,7 @@ import streamlit as st
 import torch
 
 class SentimentAnalyzer:
+    # Cache invalidation: 2026-02-04 18:37 - Fixed model ID
     def __init__(self, model_id="ejerez003/robertuito-guatemala-v2.0"):
         self.model_id = model_id
         self.classifier = None
