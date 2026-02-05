@@ -125,7 +125,53 @@ def main():
 
                 # Tabla de Resultados
                 st.subheader("📋 Datos Procesados")
-                st.dataframe(result_df)
+                
+                # Detectar si hay columna de sentimiento original
+                sentiment_cols = ['sentiment', 'sentimiento', 'Sentiment', 'Sentimiento']
+                original_sentiment_col = None
+                for col in sentiment_cols:
+                    if col in df.columns and col != 'sentiment':  # Evitar la columna que acabamos de crear
+                        original_sentiment_col = col
+                        break
+                
+                # Si hay sentimiento original, convertir escala numérica a labels
+                if original_sentiment_col:
+                    def convert_numeric_sentiment(val):
+                        """Convierte escala -5 a 5 en labels"""
+                        try:
+                            num = float(val)
+                            if num < -1:
+                                return 'negative'
+                            elif num > 1:
+                                return 'positive'
+                            else:
+                                return 'neutral'
+                        except:
+                            return 'unknown'
+                    
+                    result_df['sentiment_original'] = df[original_sentiment_col].apply(convert_numeric_sentiment)
+                    
+                    # Reordenar columnas para poner comparación lado a lado
+                    cols = result_df.columns.tolist()
+                    # Buscar índice de 'sentiment' (modelo V2)
+                    if 'sentiment' in cols and 'sentiment_original' in cols:
+                        sent_idx = cols.index('sentiment')
+                        cols.remove('sentiment_original')
+                        cols.insert(sent_idx, 'sentiment_original')
+                        result_df = result_df[cols]
+                
+                # Aplicar estilo con fondo amarillo a columnas del modelo V2
+                def highlight_v2_columns(df):
+                    """Aplica fondo amarillo claro a columnas del modelo V2"""
+                    v2_cols = ['sentiment', 'confidence']
+                    styles = pd.DataFrame('', index=df.index, columns=df.columns)
+                    for col in v2_cols:
+                        if col in df.columns:
+                            styles[col] = 'background-color: #fff9c4'  # Amarillo claro
+                    return styles
+                
+                styled_df = result_df.style.apply(highlight_v2_columns, axis=None)
+                st.dataframe(styled_df, use_container_width=True)
 
                 # Descarga
                 csv = convert_df(result_df)
