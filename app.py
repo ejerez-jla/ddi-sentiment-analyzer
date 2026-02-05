@@ -24,14 +24,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Cache de recursos para evitar recargas constantes de modelos
-@st.cache_resource
-def get_sentiment_analyzer():
-    return SentimentAnalyzer()
-
-@st.cache_resource
-def get_topic_detector():
-    return TopicDetector()
+# Lazy loading - no pre-cargar modelos para ahorrar memoria
+# Los modelos se cargarán solo cuando el usuario haga click en "Iniciar Análisis"
 
 def convert_df(df):
     """Convierte DataFrame a CSV para descarga."""
@@ -88,17 +82,23 @@ def main():
                 start_time = time.time()
                 result_df = df.copy()
 
-                # 1. Análisis de Sentimiento
+                # 1. Análisis de Sentimiento (lazy loading)
                 if use_sentiment:
+                    with st.spinner('🤖 Cargando modelo de sentimiento...'):
+                        analyzer = SentimentAnalyzer()
                     with st.spinner('🤖 Analizando Sentimientos (RoBERTuito v2.0)...'):
-                        analyzer = get_sentiment_analyzer()
                         result_df = analyzer.analyze(result_df)
+                    # Liberar memoria
+                    del analyzer
 
-                # 2. Detección de Tópicos
+                # 2. Detección de Tópicos (lazy loading)
                 if use_topics:
+                    with st.spinner('🧠 Cargando modelo de tópicos...'):
+                        detector = TopicDetector()
                     with st.spinner('🧠 Detectando Tópicos (Zero-Shot)...'):
-                        detector = get_topic_detector()
                         result_df = detector.detect(result_df)
+                    # Liberar memoria
+                    del detector
 
                 duration = time.time() - start_time
                 st.success(f"🎉 Procesamiento completado en {duration:.1f} segundos!")
