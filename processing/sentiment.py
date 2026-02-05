@@ -5,7 +5,7 @@ import streamlit as st
 import torch
 
 class SentimentAnalyzer:
-    def __init__(self, model_id="accesosddi/Sentimiento2"):
+    def __init__(self, model_id="ejerez003/robertuito-guatemala-v2.0"):
         self.model_id = model_id
         self.classifier = None
         self.device = 0 if torch.cuda.is_available() else -1
