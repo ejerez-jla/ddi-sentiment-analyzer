@@ -41,9 +41,12 @@ HF_TOKEN = getpass('   Ingresa tu HF Token: ')
 os.environ["HF_TOKEN"] = HF_TOKEN
 
 # 2. Ngrok Authtoken (para túnel público)
-# Obtener GRATIS en: https://dashboard.ngrok.com/get-started/your-authtoken
+# ⚠️ IMPORTANTE: No uses una "API Key". Usa el "Authtoken" que está en el menú izquierdo.
+# Obtener aquí: https://dashboard.ngrok.com/get-started/your-authtoken
 print("\n2️⃣ Authtoken de Ngrok (Obligatorio para Colab):")
-print("   Obtenlo aquí: https://dashboard.ngrok.com/get-started/your-authtoken")
+print("   Ve a 'Your Authtoken' en el menú izquierdo de Ngrok.")
+print("   URL directa: https://dashboard.ngrok.com/get-started/your-authtoken")
+print("   (Debe empezar con '2o...')")
 NGROK_TOKEN = getpass('   Ingresa tu Ngrok Authtoken: ')
 ngrok.set_auth_token(NGROK_TOKEN)
 
