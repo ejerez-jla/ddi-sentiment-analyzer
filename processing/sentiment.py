@@ -75,7 +75,8 @@ class SentimentAnalyzer:
                 st.error(f"❌ Error procesando batch {i//batch_size + 1}: {e}")
                 all_results.extend([{"sentiment": "error", "confidence": 0.0}] * len(batch))
             
-            progress_bar.progress((i + batch_size) / len(texts))
+            progress_value = min((i + batch_size) / len(texts), 1.0)
+            progress_bar.progress(progress_value)
         
         progress_bar.empty()
         status_text.empty()
