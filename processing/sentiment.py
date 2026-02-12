@@ -1,79 +1,87 @@
-import pandas as pd
-from transformers import pipeline
-from pysentimiento.preprocessing import preprocess_tweet
+import requests
 import streamlit as st
-import torch
+import logging
+
+logger = logging.getLogger(__name__)
 
 class SentimentAnalyzer:
-    # Cache invalidation: 2026-02-04 18:37 - Fixed model ID
-    def __init__(self, model_id="ejerez003/robertuito-guatemala-v2.0"):
-        self.model_id = model_id
-        self.classifier = None
-        self.device = 0 if torch.cuda.is_available() else -1
-
-    @st.cache_resource(show_spinner=False)
-    def load_model(_self):
-        """Carga el modelo de Hugging Face y lo cachea."""
-        try:
-            classifier = pipeline(
-                'text-classification',
-                model=_self.model_id,
-                device=_self.device
-            )
-            return classifier
-        except Exception as e:
-            st.error(f"Error cargando el modelo de sentimiento: {e}")
-            return None
-
-    def analyze(self, df, text_column='Comentario'):
-        """Analiza el sentimiento de un DataFrame."""
+    """Cliente para el API de análisis de sentimiento en Colab"""
+    
+    def __init__(self, api_url=None):
+        """
+        Inicializa el cliente del API.
         
-        self.classifier = self.load_model()
-        if not self.classifier:
+        Args:
+            api_url: URL del endpoint de Colab (ej: https://xxxx.ngrok.io)
+        """
+        self.api_url = api_url
+        
+    def analyze(self, df):
+        """
+        Analiza sentimientos usando el API de Colab.
+        
+        Args:
+            df: DataFrame con columna 'Comentario'
+            
+        Returns:
+            DataFrame con columnas 'sentiment' y 'confidence' agregadas
+        """
+        if not self.api_url:
+            st.error("❌ URL del API no configurada. Ver instrucciones en la barra lateral.")
             return df
-
-        # Mapeo de resultados
-        label_mapping = {
-            "positivo": "positive",
-            "negativo": "negative",
-            "neutro": "neutral"
-        }
-
-        sentiments = []
-        scores = []
+            
+        # Validar que el API está disponible
+        try:
+            health_response = requests.get(f"{self.api_url}/health", timeout=5)
+            if health_response.status_code != 200:
+                st.error(f"❌ El API no responde correctamente: {health_response.status_code}")
+                return df
+        except Exception as e:
+            st.error(f"❌ No se puede conectar al API: {e}")
+            st.info("💡 Asegúrate de que el notebook de Colab esté ejecutándose y la URL sea correcta.")
+            return df
         
-        total = len(df)
+        # Preparar textos
+        texts = df['Comentario'].fillna("").astype(str).tolist()
+        
+        # Llamar al API en batches (para evitar timeouts)
+        batch_size = 50
+        all_results = []
+        
         progress_bar = st.progress(0)
         status_text = st.empty()
-
-        for i, text in enumerate(df[text_column]):
-            try:
-                # Preprocesamiento
-                text_prep = preprocess_tweet(str(text))
-                
-                # Predicción
-                result = self.classifier(text_prep, truncation=True, max_length=128)
-                
-                label = result[0]['label']
-                label = label_mapping.get(label, "neutral")
-                score = result[0]['score']
-
-                sentiments.append(label)
-                scores.append(score)
-
-                # Actualizar progreso cada 10 items o al final
-                if (i + 1) % 10 == 0 or (i + 1) == total:
-                    progress_bar.progress((i + 1) / total)
-                    status_text.text(f"Procesando sentimiento: {i + 1}/{total}")
-
-            except Exception:
-                sentiments.append("error")
-                scores.append(0.0)
-
-        df['sentiment'] = sentiments
-        df['confidence'] = scores
         
-        status_text.empty()
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i:i+batch_size]
+            status_text.text(f"Procesando {i+1}-{min(i+batch_size, len(texts))} de {len(texts)} comentarios...")
+            
+            try:
+                response = requests.post(
+                    f"{self.api_url}/analyze",
+                    json={"texts": batch},
+                    timeout=120  # 2 minutos max por batch
+                )
+                
+                if response.status_code == 200:
+                    results = response.json()['results']
+                    all_results.extend(results)
+                else:
+                    st.error(f"❌ Error en batch {i//batch_size + 1}: {response.status_code}")
+                    # Agregar resultados vacíos para este batch
+                    all_results.extend([{"sentiment": "error", "confidence": 0.0}] * len(batch))
+                    
+            except Exception as e:
+                logger.error(f"Error procesando batch {i//batch_size + 1}: {e}")
+                st.error(f"❌ Error procesando batch {i//batch_size + 1}: {e}")
+                all_results.extend([{"sentiment": "error", "confidence": 0.0}] * len(batch))
+            
+            progress_bar.progress((i + batch_size) / len(texts))
+        
         progress_bar.empty()
+        status_text.empty()
+        
+        # Agregar resultados al DataFrame
+        df['sentiment'] = [r['sentiment'] for r in all_results]
+        df['confidence'] = [r['confidence'] for r in all_results]
         
         return df

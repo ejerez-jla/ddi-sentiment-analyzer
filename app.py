@@ -1,16 +1,19 @@
 import streamlit as st
 import pandas as pd
 import io
-import time
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 # Importar módulos locales
 from processing.sentiment import SentimentAnalyzer
-from processing.topics import TopicDetector
-from components.visualizer import plot_sentiment_distribution, plot_topic_distribution
+from components.visualizer import (
+    plot_sentiment_distribution,
+    plot_confusion_matrix,
+    plot_comparison_bars
+)
 
 # Configuración de la página
 st.set_page_config(
-    page_title="DDI Analytics - Sentimiento & Tópicos",
+    page_title="DDI Sentiment Analyzer - RoBERTuito V2",
     page_icon="🧠",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -19,171 +22,232 @@ st.set_page_config(
 # Estilos CSS
 st.markdown("""
 <style>
-    .main-header { font-size: 2.5rem; color: #1E3A8A; font-weight: 700; }
-    .sub-header { font-size: 1.5rem; color: #4B5563; }
+    .main-header {
+        font-size: 2.5rem;
+        font-weight: bold;
+        color: #1976D2;
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+    .metric-card {
+        background-color: #f0f2f6;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin: 0.5rem 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# Lazy loading - no pre-cargar modelos para ahorrar memoria
-# Los modelos se cargarán solo cuando el usuario haga click en "Iniciar Análisis"
+# Header
+st.markdown('<p class="main-header">🧠 DDI Sentiment Analyzer</p>', unsafe_allow_html=True)
+st.markdown("**Modelo**: RoBERTuito V2.0 (Fine-tuned para Guatemala)")
 
-def convert_df(df):
-    """Convierte DataFrame a CSV para descarga."""
-    return df.to_csv(index=False).encode('utf-8')
+# Sidebar - Configuración
+with st.sidebar:
+    st.header("⚙️ Configuración")
+    
+    st.markdown("### 🌐 URL del API (Colab)")
+    st.info("""
+    **Instrucciones**:
+    1. Abre el notebook `DDI_Sentiment_API_Colab.ipynb` en Google Colab
+    2. Ejecuta todas las celdas
+    3. Copia la URL pública generada (ej: https://xxxx.ngrok.io)
+    4. Pégala abajo
+    """)
+    
+    api_url = st.text_input(
+        "URL del API",
+        placeholder="https://xxxx.ngrok.io",
+        help="URL pública del notebook de Colab"
+    )
+    
+    st.markdown("---")
+    st.markdown("### 📊 Opciones de Análisis")
+    use_sentiment = st.checkbox("Análisis de Sentimiento V2", value=True, disabled=True)
+    
+    st.markdown("---")
+    st.markdown("### ℹ️ Información")
+    st.caption("Versión: 2.0.0")
+    st.caption("Modelo: accesosddi/Sentimiento2")
 
-def main():
-    # Sidebar
-    with st.sidebar:
-        st.image("https://cdn-icons-png.flaticon.com/512/2103/2103633.png", width=80)
-        st.title("DDI Analytics")
-        st.info("Herramienta de IA para análisis de sentimiento y tópicos.")
+# Main content
+st.markdown("### 📂 Cargar Archivo")
+st.markdown("Sube un archivo Excel o CSV con las columnas **`Comentario`** y **`sentiment`** (original)")
+
+uploaded_file = st.file_uploader(
+    "Selecciona tu archivo",
+    type=['csv', 'xlsx', 'xls'],
+    help="El archivo debe contener una columna 'Comentario' con el texto y 'sentiment' con la etiqueta original (-5, 0, 5)"
+)
+
+if uploaded_file:
+    try:
+        # Leer archivo
+        if uploaded_file.name.endswith('.csv'):
+            df = pd.read_csv(uploaded_file)
+        else:
+            df = pd.read_excel(uploaded_file)
         
-        st.divider()
-        st.subheader("Configuración")
-        use_sentiment = st.checkbox("Analizar Sentimiento", value=True)
-        use_topics = st.checkbox("Detectar Tópicos", value=False, disabled=True, 
-                                  help="⚠️ Deshabilitado temporalmente: El modelo requiere >1GB de RAM (límite de Streamlit Free Tier)")
+        st.success(f"✅ Archivo cargado: {len(df)} filas, {len(df.columns)} columnas")
         
-        if use_topics:
-            st.warning("⚠️ La detección de tópicos requiere recursos adicionales. Considera usar solo análisis de sentimiento.")
+        # Validar columnas requeridas
+        if 'Comentario' not in df.columns:
+            st.error("❌ El archivo debe contener una columna llamada 'Comentario'")
+            st.stop()
         
-        st.divider()
-        st.caption("v1.0.0 | Powered by RoBERTuito & ZeroShot")
-
-    # Header
-    st.markdown('<div class="main-header">Motor de Inteligencia de Datos DDI</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-header">Carga tu archivo de comentarios para comenzar.</div>', unsafe_allow_html=True)
-    st.divider()
-
-    # Carga de archivo
-    uploaded_file = st.file_uploader("Sube un archivo Excel (.xlsx) o CSV", type=['xlsx', 'csv'])
-
-    if uploaded_file is not None:
-        try:
-            # Detectar formato
-            if uploaded_file.name.lower().endswith('.csv'):
-                try:
-                    df = pd.read_csv(uploaded_file)
-                except:
-                   df = pd.read_csv(uploaded_file, encoding='latin-1') 
+        # Buscar columna de sentimiento original
+        sentiment_col = None
+        for col in ['sentiment', 'Sentiment', 'sentimiento', 'Sentimiento']:
+            if col in df.columns:
+                sentiment_col = col
+                break
+        
+        if not sentiment_col:
+            st.warning("⚠️ No se encontró columna de sentimiento original. Se procesará sin comparación.")
+            has_original = False
+        else:
+            st.info(f"📊 Columna de sentimiento original detectada: `{sentiment_col}`")
+            has_original = True
+        
+        # Mostrar preview
+        with st.expander("👀 Vista previa del archivo"):
+            st.dataframe(df.head(10))
+        
+        # Botón para procesar
+        if st.button("🚀 Analizar Sentimientos", type="primary"):
+            if not api_url:
+                st.error("❌ Debes configurar la URL del API en la barra lateral")
+                st.stop()
+            
+            # Convertir sentimiento original a labels si existe
+            if has_original:
+                def convert_numeric_sentiment(val):
+                    """Convierte escala numérica a labels"""
+                    try:
+                        num = float(val)
+                        if num < 0:
+                            return 'negative'
+                        elif num > 0:
+                            return 'positive'
+                        else:
+                            return 'neutral'
+                    except:
+                        return 'neutral'
+                
+                df['sentiment_original'] = df[sentiment_col].apply(convert_numeric_sentiment)
+                st.success(f"✅ Sentimiento original convertido: {df['sentiment_original'].value_counts().to_dict()}")
+            
+            # Procesar con RoBERTuito V2
+            st.markdown("---")
+            st.subheader("🤖 Procesando con RoBERTuito V2...")
+            
+            analyzer = SentimentAnalyzer(api_url=api_url)
+            result_df = analyzer.analyze(df)
+            
+            if 'sentiment' not in result_df.columns:
+                st.error("❌ Error en el procesamiento. Verifica que el API esté funcionando.")
+                st.stop()
+            
+            st.success("✅ Análisis completado!")
+            
+            # Dashboard de Resultados
+            st.markdown("---")
+            st.subheader("📊 Resultados del Análisis")
+            
+            # Si hay sentimiento original, mostrar comparación
+            if has_original and 'sentiment_original' in result_df.columns:
+                st.markdown("### 🔍 Evaluación: Original vs V2")
+                
+                # Calcular métricas
+                y_true = result_df['sentiment_original'].values
+                y_pred = result_df['sentiment'].values
+                
+                # Filtrar errores
+                valid_mask = (y_pred != 'error')
+                y_true_valid = y_true[valid_mask]
+                y_pred_valid = y_pred[valid_mask]
+                
+                if len(y_true_valid) > 0:
+                    accuracy = accuracy_score(y_true_valid, y_pred_valid)
+                    precision = precision_score(y_true_valid, y_pred_valid, average='weighted', zero_division=0)
+                    recall = recall_score(y_true_valid, y_pred_valid, average='weighted', zero_division=0)
+                    f1 = f1_score(y_true_valid, y_pred_valid, average='weighted', zero_division=0)
+                    
+                    # Mostrar métricas
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        st.metric("Accuracy", f"{accuracy:.2%}")
+                    with col2:
+                        st.metric("Precision", f"{precision:.2%}")
+                    with col3:
+                        st.metric("Recall", f"{recall:.2%}")
+                    with col4:
+                        st.metric("F1-Score", f"{f1:.2%}")
+                    
+                    # Gráficos de comparación
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        fig_cm = plot_confusion_matrix(y_true_valid, y_pred_valid)
+                        if fig_cm:
+                            st.plotly_chart(fig_cm, use_container_width=True)
+                    
+                    with col2:
+                        fig_comp = plot_comparison_bars(result_df)
+                        if fig_comp:
+                            st.plotly_chart(fig_comp, use_container_width=True)
+                else:
+                    st.warning("⚠️ No hay predicciones válidas para calcular métricas")
+            
             else:
-                df = pd.read_excel(uploaded_file)
+                # Solo mostrar distribución V2
+                st.markdown("### 📈 Distribución de Sentimientos V2")
+                fig_sent = plot_sentiment_distribution(result_df)
+                if fig_sent:
+                    st.plotly_chart(fig_sent, use_container_width=True)
             
-            # Validación
-            if 'Comentario' not in df.columns:
-                st.error("❌ El archivo NO contiene la columna obligatoria 'Comentario'.")
-                st.dataframe(df.head())
-                return
-
-            st.success(f"✅ Archivo cargado: {uploaded_file.name} ({len(df)} filas)")
+            # Tabla de resultados
+            st.markdown("---")
+            st.subheader("📋 Datos Procesados")
             
-            with st.expander("👀 Vista previa de datos", expanded=False):
-                st.dataframe(df.head())
+            # Reordenar columnas para mostrar comparación
+            if has_original and 'sentiment_original' in result_df.columns:
+                # Poner columnas de sentimiento juntas
+                cols = result_df.columns.tolist()
+                if 'sentiment_original' in cols and 'sentiment' in cols:
+                    cols.remove('sentiment_original')
+                    sent_idx = cols.index('sentiment')
+                    cols.insert(sent_idx, 'sentiment_original')
+                    result_df = result_df[cols]
+            
+            # Aplicar estilo
+            def highlight_v2_columns(df):
+                """Aplica fondo amarillo a columnas V2"""
+                v2_cols = ['sentiment', 'confidence']
+                styles = pd.DataFrame('', index=df.index, columns=df.columns)
+                for col in v2_cols:
+                    if col in df.columns:
+                        styles[col] = 'background-color: #fff9c4'
+                return styles
+            
+            styled_df = result_df.style.apply(highlight_v2_columns, axis=None)
+            st.dataframe(styled_df, use_container_width=True)
+            
+            # Descarga
+            st.markdown("---")
+            st.subheader("📥 Descargar Resultados")
+            
+            csv = result_df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Descargar CSV con Resultados",
+                data=csv,
+                file_name=f"analisis_ddi_{uploaded_file.name.split('.')[0]}_v2.csv",
+                mime="text/csv"
+            )
+    
+    except Exception as e:
+        st.error(f"❌ Error procesando el archivo: {e}")
+        st.exception(e)
 
-            # Botón de Procesar
-            if st.button("🚀 Iniciar Análisis", type="primary"):
-                
-                start_time = time.time()
-                result_df = df.copy()
-
-                # 1. Análisis de Sentimiento (lazy loading)
-                if use_sentiment:
-                    with st.spinner('🤖 Cargando modelo de sentimiento...'):
-                        analyzer = SentimentAnalyzer()
-                    with st.spinner('🤖 Analizando Sentimientos (RoBERTuito v2.0)...'):
-                        result_df = analyzer.analyze(result_df)
-                    # Liberar memoria
-                    del analyzer
-
-                # 2. Detección de Tópicos (lazy loading)
-                if use_topics:
-                    with st.spinner('🧠 Cargando modelo de tópicos...'):
-                        detector = TopicDetector()
-                    with st.spinner('🧠 Detectando Tópicos (Zero-Shot)...'):
-                        result_df = detector.detect(result_df)
-                    # Liberar memoria
-                    del detector
-
-                duration = time.time() - start_time
-                st.success(f"🎉 Procesamiento completado en {duration:.1f} segundos!")
-
-                # Resultados Visuales
-                st.divider()
-                st.subheader("📊 Dashboard de Resultados")
-                
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    if use_sentiment:
-                        fig_sent = plot_sentiment_distribution(result_df)
-                        if fig_sent: st.plotly_chart(fig_sent, use_container_width=True)
-                
-                with col2:
-                    if use_topics:
-                        fig_topic = plot_topic_distribution(result_df)
-                        if fig_topic: st.plotly_chart(fig_topic, use_container_width=True)
-
-                # Tabla de Resultados
-                st.subheader("📋 Datos Procesados")
-                
-                # Detectar si hay columna de sentimiento original
-                sentiment_cols = ['sentiment', 'sentimiento', 'Sentiment', 'Sentimiento']
-                original_sentiment_col = None
-                for col in sentiment_cols:
-                    if col in df.columns and col != 'sentiment':  # Evitar la columna que acabamos de crear
-                        original_sentiment_col = col
-                        break
-                
-                # Si hay sentimiento original, convertir escala numérica a labels
-                if original_sentiment_col:
-                    def convert_numeric_sentiment(val):
-                        """Convierte escala -5 a 5 en labels"""
-                        try:
-                            num = float(val)
-                            if num < -1:
-                                return 'negative'
-                            elif num > 1:
-                                return 'positive'
-                            else:
-                                return 'neutral'
-                        except:
-                            return 'unknown'
-                    
-                    result_df['sentiment_original'] = df[original_sentiment_col].apply(convert_numeric_sentiment)
-                    
-                    # Reordenar columnas para poner comparación lado a lado
-                    cols = result_df.columns.tolist()
-                    # Buscar índice de 'sentiment' (modelo V2)
-                    if 'sentiment' in cols and 'sentiment_original' in cols:
-                        sent_idx = cols.index('sentiment')
-                        cols.remove('sentiment_original')
-                        cols.insert(sent_idx, 'sentiment_original')
-                        result_df = result_df[cols]
-                
-                # Aplicar estilo con fondo amarillo a columnas del modelo V2
-                def highlight_v2_columns(df):
-                    """Aplica fondo amarillo claro a columnas del modelo V2"""
-                    v2_cols = ['sentiment', 'confidence']
-                    styles = pd.DataFrame('', index=df.index, columns=df.columns)
-                    for col in v2_cols:
-                        if col in df.columns:
-                            styles[col] = 'background-color: #fff9c4'  # Amarillo claro
-                    return styles
-                
-                styled_df = result_df.style.apply(highlight_v2_columns, axis=None)
-                st.dataframe(styled_df, use_container_width=True)
-
-                # Descarga
-                csv = convert_df(result_df)
-                st.download_button(
-                    label="📥 Descargar CSV con Resultados",
-                    data=csv,
-                    file_name=f"analisis_ddi_{uploaded_file.name.split('.')[0]}.csv",
-                    mime='text/csv',
-                )
-
-        except Exception as e:
-            st.error(f"Error procesando el archivo: {e}")
-
-if __name__ == "__main__":
-    main()
+else:
+    st.info("👆 Sube un archivo para comenzar el análisis")
