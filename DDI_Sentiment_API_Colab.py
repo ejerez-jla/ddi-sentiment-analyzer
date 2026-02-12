@@ -45,7 +45,7 @@ print("✅ Token configurado")
 print("🤖 Cargando modelo RoBERTuito V2...")
 print("   (Esto puede tomar 1-2 minutos)")
 
-MODEL_ID = "accesosddi/Sentimiento2"
+MODEL_ID = "ejerez003/robertuito-guatemala-v2.0"
 
 classifier = pipeline(
     'text-classification',
