@@ -126,13 +126,13 @@ if uploaded_file:
                     try:
                         num = float(val)
                         if num < 0:
-                            return 'negative'
+                            return 'negativo'
                         elif num > 0:
-                            return 'positive'
+                            return 'positivo'
                         else:
-                            return 'neutral'
+                            return 'neutro'
                     except:
-                        return 'neutral'
+                        return 'neutro'
                 
                 df['sentiment_original'] = df[sentiment_col].apply(convert_numeric_sentiment)
                 st.success(f"✅ Sentimiento original convertido: {df['sentiment_original'].value_counts().to_dict()}")
@@ -143,6 +143,16 @@ if uploaded_file:
             
             analyzer = SentimentAnalyzer(api_url=api_url)
             result_df = analyzer.analyze(df)
+            
+            # Traducir resultados del API a Español
+            translation_map = {
+                'positive': 'positivo',
+                'negative': 'negativo',
+                'neutral': 'neutro',
+                'error': 'error'
+            }
+            if 'sentiment' in result_df.columns:
+                result_df['sentiment'] = result_df['sentiment'].map(lambda x: translation_map.get(x, x))
             
             if 'sentiment' not in result_df.columns:
                 st.error("❌ Error en el procesamiento. Verifica que el API esté funcionando.")

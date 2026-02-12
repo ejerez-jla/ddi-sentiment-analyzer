@@ -12,11 +12,11 @@ def plot_sentiment_distribution(df):
     
     counts = df['sentiment'].value_counts()
     
-    # Colores personalizados
+    # Colores personalizados (Español)
     colors = {
-        'positive': '#4CAF50',
-        'neutral': '#FFC107',
-        'negative': '#F44336',
+        'positivo': '#4CAF50',
+        'neutro': '#FFC107',
+        'negativo': '#F44336',
         'error': '#9E9E9E'
     }
     
@@ -49,14 +49,14 @@ def plot_topic_distribution(df):
     fig.update_layout(yaxis={'categoryorder': 'total ascending'})
     return fig
 
-def plot_confusion_matrix(y_true, y_pred, labels=['negative', 'neutral', 'positive']):
+def plot_confusion_matrix(y_true, y_pred, labels=['negativo', 'neutro', 'positivo']):
     """
     Genera un heatmap de la matriz de confusión.
     
     Args:
         y_true: Etiquetas reales
         y_pred: Etiquetas predichas
-        labels: Lista de labels en orden
+        labels: Lista de labels en orden (Español)
     """
     cm = confusion_matrix(y_true, y_pred, labels=labels)
     
@@ -99,7 +99,7 @@ def plot_comparison_bars(df, original_col='sentiment_original', v2_col='sentimen
     v2_counts = df[v2_col].value_counts()
     
     # Crear DataFrame para plotly
-    labels = ['negative', 'neutral', 'positive']
+    labels = ['negativo', 'neutro', 'positivo']
     comparison_data = pd.DataFrame({
         'Sentimiento': labels * 2,
         'Cantidad': [original_counts.get(l, 0) for l in labels] + [v2_counts.get(l, 0) for l in labels],
