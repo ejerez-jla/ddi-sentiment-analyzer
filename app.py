@@ -164,8 +164,8 @@ if uploaded_file:
                 
                 # Filtrar errores
                 valid_mask = (y_pred != 'error')
-                y_true_valid = y_true[valid_mask]
-                y_pred_valid = y_pred[valid_mask]
+                y_true_valid = y_true[valid_mask].astype(str)
+                y_pred_valid = y_pred[valid_mask].astype(str)
                 
                 if len(y_true_valid) > 0:
                     accuracy = accuracy_score(y_true_valid, y_pred_valid)

@@ -45,7 +45,7 @@ class SentimentAnalyzer:
         texts = df['Comentario'].fillna("").astype(str).tolist()
         
         # Llamar al API en batches (para evitar timeouts)
-        batch_size = 50
+        batch_size = 20
         all_results = []
         
         progress_bar = st.progress(0)
