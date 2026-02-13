@@ -30,9 +30,14 @@ st.markdown(f"""
         [data-testid="stSidebar"] {{
             background-color: {ddi_navy};
         }}
-        /* Sidebar: Textos en Blanco */
-        [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] label, [data-testid="stSidebar"] p, [data-testid="stSidebar"] span {{
+        /* Sidebar: Textos en Blanco - FORZAR todo el texto a blanco */
+        [data-testid="stSidebar"] * {{
             color: white !important;
+        }}
+        
+        /* Excepción: Inputs necesitan texto negro o visible dentro del campo */
+        [data-testid="stSidebar"] input {{
+            color: #333 !important;
         }}
         
         /* Títulos Principales: Azul DDI */
@@ -92,14 +97,14 @@ with st.sidebar:
     
     st.markdown("### 🌐 URL del API (Colab)")
     
-    # Instrucciones con estilo personalizado (Blanco para contraste con fondo Navy)
+    # Instrucciones con estilo personalizado - Mejor contraste
     st.markdown("""
-    <div style='background-color: rgba(255,255,255,0.1); padding: 10px; border-radius: 5px; font-size: 0.9em;'>
-        <strong>Instrucciones:</strong>
-        <ol style='margin-left: -20px;'>
-            <li>Abre el notebook <code>DDI_Sentiment_API_Colab.ipynb</code> en Google Colab</li>
-            <li>Ejecuta todas las celdas</li>
-            <li>Copia la URL pública generada (ej: <code>https://xxxx.ngrok.io</code>)</li>
+    <div style='background-color: rgba(255,255,255,0.15); padding: 15px; border-radius: 8px; font-size: 0.9em; color: white; border: 1px solid rgba(255,255,255,0.2);'>
+        <strong style='color: #D5AB3E;'>Instrucciones:</strong>
+        <ol style='margin-left: -20px; margin-top: 5px;'>
+            <li style='margin-bottom: 5px;'>Abre el notebook <code style='background-color: rgba(0,0,0,0.3); color: #59ADA8; padding: 2px 5px; border-radius: 3px;'>DDI_Sentiment_API_Colab.ipynb</code> en Google Colab</li>
+            <li style='margin-bottom: 5px;'>Ejecuta todas las celdas</li>
+            <li style='margin-bottom: 5px;'>Copia la URL pública generada (ej: <code style='background-color: rgba(0,0,0,0.3); color: #59ADA8; padding: 2px 5px; border-radius: 3px;'>https://xxxx.ngrok.io</code>)</li>
             <li>Pégala abajo</li>
         </ol>
     </div>
