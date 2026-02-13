@@ -13,11 +13,51 @@ from components.visualizer import (
 
 # Configuración de la página
 st.set_page_config(
-    page_title="DDI Sentiment Analyzer - RoBERTuito V2",
-    page_icon="🧠",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    page_title="DDI Sentiment Analyzer",
+    page_icon="🤖",
+    layout="wide"
 )
+
+# --- ESTILO PERSONALIZADO DDI ---
+ddi_blue = "#142B5F"
+ddi_gold = "#D5AB3E"
+ddi_teal = "#59ADA8"
+ddi_navy = "#052649"
+
+st.markdown(f"""
+    <style>
+        /* Sidebar: Fondo Azul Marino DDI */
+        [data-testid="stSidebar"] {{
+            background-color: {ddi_navy};
+        }}
+        /* Sidebar: Textos en Blanco */
+        [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] label, [data-testid="stSidebar"] p, [data-testid="stSidebar"] span {{
+            color: white !important;
+        }}
+        
+        /* Títulos Principales: Azul DDI */
+        h1, h2, h3 {{
+            color: {ddi_blue} !important;
+        }}
+        
+        /* Botones: Dorado DDI */
+        div.stButton > button:first-child {{
+            background-color: {ddi_gold} !important;
+            color: white !important;
+            border-radius: 8px;
+            border: none;
+            font-weight: bold;
+        }}
+        div.stButton > button:first-child:hover {{
+            background-color: #B58B2E !important; /* Dorado más oscuro al hover */
+        }}
+        
+        /* Barras de Progreso: Teal DDI */
+        .stProgress > div > div > div > div {{
+            background-color: {ddi_teal} !important;
+        }}
+    </style>
+""", unsafe_allow_html=True)
 
 # Estilos CSS
 st.markdown("""

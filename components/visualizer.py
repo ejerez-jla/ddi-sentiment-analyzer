@@ -12,11 +12,12 @@ def plot_sentiment_distribution(df):
     
     counts = df['sentiment'].value_counts()
     
-    # Colores personalizados (Español)
+    # Colores personalizados (Marca DDI)
+    # Positivo: Teal DDI, Neutro: Dorado DDI, Negativo: Rojo (Standard para alerta)
     colors = {
-        'positivo': '#4CAF50',
-        'neutro': '#FFC107',
-        'negativo': '#F44336',
+        'positivo': '#59ADA8',  # DDI Teal
+        'neutro': '#D5AB3E',    # DDI Gold
+        'negativo': '#E53935',  # Soft Red (Combina bien)
         'error': '#9E9E9E'
     }
     
