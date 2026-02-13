@@ -62,38 +62,48 @@ st.markdown(f"""
 # Estilos CSS
 st.markdown("""
 <style>
-    .main-header {
+    .main-header {{
         font-size: 2.5rem;
         font-weight: bold;
-        color: #1976D2;
+        color: {ddi_blue};
         text-align: center;
         margin-bottom: 1rem;
-    }
-    .metric-card {
+    }}
+    .metric-card {{
         background-color: #f0f2f6;
         padding: 1rem;
         border-radius: 0.5rem;
         margin: 0.5rem 0;
-    }
+    }}
 </style>
 """, unsafe_allow_html=True)
 
 # Header
-st.markdown('<p class="main-header">🧠 DDI Sentiment Analyzer</p>', unsafe_allow_html=True)
-st.markdown("**Modelo**: RoBERTuito V2.0 (Fine-tuned para Guatemala)")
+st.markdown('<p class="main-header">DDI Sentiment Analyzer</p>', unsafe_allow_html=True)
+st.markdown(f"<div style='text-align: center; color: gray;'>Modelo: RoBERTuito V2.0 (Fine-tuned para Guatemala)</div>", unsafe_allow_html=True)
 
 # Sidebar - Configuración
 with st.sidebar:
+    # Logo DDI en la parte superior
+    logo_url = "https://ddilatam.com/wp-content/uploads/2024/08/DDI-LOGO-COLOR-OK-09_0064002e0_2244.png"
+    st.image(logo_url, use_column_width=True)
+    
     st.header("⚙️ Configuración")
     
     st.markdown("### 🌐 URL del API (Colab)")
-    st.info("""
-    **Instrucciones**:
-    1. Abre el notebook `DDI_Sentiment_API_Colab.ipynb` en Google Colab
-    2. Ejecuta todas las celdas
-    3. Copia la URL pública generada (ej: https://xxxx.ngrok.io)
-    4. Pégala abajo
-    """)
+    
+    # Instrucciones con estilo personalizado (Blanco para contraste con fondo Navy)
+    st.markdown("""
+    <div style='background-color: rgba(255,255,255,0.1); padding: 10px; border-radius: 5px; font-size: 0.9em;'>
+        <strong>Instrucciones:</strong>
+        <ol style='margin-left: -20px;'>
+            <li>Abre el notebook <code>DDI_Sentiment_API_Colab.ipynb</code> en Google Colab</li>
+            <li>Ejecuta todas las celdas</li>
+            <li>Copia la URL pública generada (ej: <code>https://xxxx.ngrok.io</code>)</li>
+            <li>Pégala abajo</li>
+        </ol>
+    </div>
+    """, unsafe_allow_html=True)
     
     api_url = st.text_input(
         "URL del API",
