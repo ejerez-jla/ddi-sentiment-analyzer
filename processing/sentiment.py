@@ -27,18 +27,18 @@ class SentimentAnalyzer:
             DataFrame con columnas 'sentiment' y 'confidence' agregadas
         """
         if not self.api_url:
-            st.error("❌ URL del API no configurada. Ver instrucciones en la barra lateral.")
+            st.error("URL del API no configurada. Ver instrucciones en la barra lateral.")
             return df
             
         # Validar que el API está disponible
         try:
             health_response = requests.get(f"{self.api_url}/health", timeout=5)
             if health_response.status_code != 200:
-                st.error(f"❌ El API no responde correctamente: {health_response.status_code}")
+                st.error(f"El API no responde correctamente: {health_response.status_code}")
                 return df
         except Exception as e:
-            st.error(f"❌ No se puede conectar al API: {e}")
-            st.info("💡 Asegúrate de que el notebook de Colab esté ejecutándose y la URL sea correcta.")
+            st.error(f"No se puede conectar al API: {e}")
+            st.info("Asegúrate de que el notebook de Colab esté ejecutándose y la URL sea correcta.")
             return df
         
         # Preparar textos
@@ -99,7 +99,7 @@ class SentimentAnalyzer:
                     time.sleep(2 * (attempt + 1))
             
             if not batch_success:
-                st.error(f"❌ Error definitivo en lote {current_batch}. Se omiten {len(batch)} comentarios.")
+                st.error(f"Error definitivo en lote {current_batch}. Se omiten {len(batch)} comentarios.")
                 all_results.extend([{"sentiment": "error", "confidence": 0.0}] * len(batch))
             
             # Pequeña pausa para no saturar ngrok

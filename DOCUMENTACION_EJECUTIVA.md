@@ -32,5 +32,17 @@ No estamos usando un diccionario simple de palabras (donde "malo" = negativo). E
 *   **Estandarización:** Todos usan el mismo criterio (el del modelo) para evaluar campañas, eliminando la subjetividad humana variable.
 *   **Velocidad:** Procesar 1,000 comentarios toma segundos/minutos, versus horas de lectura manual.
 
+## 6. Siguientes Pasos: Evolución a Producto (SaaS)
+Lo que hemos construido hoy es una "Prueba de Concepto" funcional. El siguiente paso natural es convertir esto en una aplicación web autónoma que funcione 24/7 sin intervención técnica.
+
+**La Diferencia:**
+*   **Hoy (Fase 1):** Un analista técnico debe "encender el horno" (Google Colab) cada vez que se quiere cocinar.
+*   **Futuro (Fase 2):** El horno está siempre encendido y listo. El usuario solo entra a la web y usa la herramienta.
+
+**Beneficios de la Fase 2:**
+1.  **Disponibilidad 24/7:** No hay que esperar a que arranque el servidor.
+2.  **Cero Mantenimiento para el Usuario:** El analista no lidia con notebooks, tokens o conexiones.
+3.  **Escalabilidad:** Puede atender a múltiples usuarios de DDI simultáneamente.
+
 ---
 *Desarrollado para DDI - Febrero 2026*

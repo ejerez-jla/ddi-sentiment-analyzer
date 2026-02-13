@@ -2,7 +2,7 @@
 
 Aplicación web para análisis de sentimiento usando el modelo RoBERTuito V2.0 fine-tuned para Guatemala.
 
-## 🏗️ Arquitectura
+## Arquitectura
 
 ```
 ┌─────────────┐      HTTP      ┌──────────────────┐
@@ -19,17 +19,17 @@ Aplicación web para análisis de sentimiento usando el modelo RoBERTuito V2.0 f
                                └──────────────────┘
 ```
 
-## ✨ Características
+## Características
 
-- ✅ Análisis de sentimiento con RoBERTuito V2.0
-- ✅ Comparación automática: Sentimiento Original vs V2
-- ✅ Métricas de evaluación: Accuracy, Precision, Recall, F1-Score
-- ✅ Matriz de confusión interactiva
-- ✅ Soporte para Excel (.xlsx) y CSV
-- ✅ Descarga de resultados procesados
-- ✅ 100% GRATIS (usando Google Colab)
+- Análisis de sentimiento con RoBERTuito V2.0
+- Comparación automática: Sentimiento Original vs V2
+- Métricas de evaluación: Accuracy, Precision, Recall, F1-Score
+- Matriz de confusión interactiva
+- Soporte para Excel (.xlsx) y CSV
+- Descarga de resultados procesados
+- 100% GRATIS (usando Google Colab)
 
-## 🚀 Guía de Uso
+## Guía de Uso
 
 ### Paso 1: Configurar el Backend (Colab)
 
@@ -47,14 +47,14 @@ Aplicación web para análisis de sentimiento usando el modelo RoBERTuito V2.0 f
 3. Sube tu archivo Excel/CSV con:
    - Columna **`Comentario`**: Texto a analizar
    - Columna **`sentiment`**: Sentimiento original (numérico: -5=negativo, 0=neutro, 5=positivo)
-4. Haz clic en **"🚀 Analizar Sentimientos"**
+4. Haz clic en **"Analizar Sentimientos"**
 5. Revisa los resultados:
    - Métricas de evaluación
    - Matriz de confusión
    - Gráficos comparativos
 6. Descarga el CSV con resultados
 
-## 📊 Formato del Archivo de Entrada
+## Formato del Archivo de Entrada
 
 ### Ejemplo Excel/CSV
 
@@ -72,15 +72,15 @@ Aplicación web para análisis de sentimiento usando el modelo RoBERTuito V2.0 f
   - Valor 0 → Neutro
   - Valores positivos (ej: 5) → Positivo
 
-## 📈 Salida
+## Salida
 
 El archivo descargado incluirá las columnas originales más:
 
 - **`sentiment_original`**: Sentimiento original convertido a labels (negative/neutral/positive)
-- **`sentiment`**: Predicción del modelo V2 (negative/neutral/positive) ⚡ *Fondo amarillo*
-- **`confidence`**: Confianza de la predicción (0.0 - 1.0) ⚡ *Fondo amarillo*
+- **`sentiment`**: Predicción del modelo V2 (negative/neutral/positive) *Fondo amarillo*
+- **`confidence`**: Confianza de la predicción (0.0 - 1.0) *Fondo amarillo*
 
-## 🔧 Desarrollo Local
+## Desarrollo Local
 
 ```bash
 # Clonar repo
@@ -94,21 +94,21 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-## 💰 Costos
+## Costos
 
 - **Streamlit Cloud**: GRATIS
 - **Google Colab**: GRATIS (Free Tier)
 - **Modelo RoBERTuito V2**: GRATIS (open source)
 
-**Total: $0/mes** 🎉
+**Total: $0/mes**
 
-## ⚠️ Limitaciones
+## Limitaciones
 
 - **Concurrencia**: 1 procesamiento a la vez por sesión de Colab
 - **Disponibilidad**: Requiere re-ejecutar Colab cada ~12 horas
 - **URL dinámica**: La URL de ngrok cambia cada vez (usar cloudflared para URL fija)
 
-## 🔮 Escalabilidad Futura
+## Escalabilidad Futura
 
 Para soportar 20+ usuarios simultáneos:
 

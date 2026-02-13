@@ -31,31 +31,31 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 # CELDA 3: Configurar Tokens (Hugging Face + Ngrok)
 # ============================================================================
-print("🔐 CONFIGURACIÓN DE SEGURIDAD")
+print("CONFIGURACIÓN DE SEGURIDAD")
 print("-" * 30)
 
 # 1. Hugging Face Token (para descargar modelo)
 # HF_TOKEN = os.getenv('HF_TOKEN') # Opción variable de entorno
-print("\n1️⃣ Token de Hugging Face:")
+print("\n1. Token de Hugging Face:")
 HF_TOKEN = getpass('   Ingresa tu HF Token: ')
 os.environ["HF_TOKEN"] = HF_TOKEN
 
 # 2. Ngrok Authtoken (para túnel público)
-# ⚠️ IMPORTANTE: No uses una "API Key". Usa el "Authtoken" que está en el menú izquierdo.
+# IMPORTANTE: No uses una "API Key". Usa el "Authtoken" que está en el menú izquierdo.
 # Obtener aquí: https://dashboard.ngrok.com/get-started/your-authtoken
-print("\n2️⃣ Authtoken de Ngrok (Obligatorio para Colab):")
+print("\n2. Authtoken de Ngrok (Obligatorio para Colab):")
 print("   Ve a 'Your Authtoken' en el menú izquierdo de Ngrok.")
 print("   URL directa: https://dashboard.ngrok.com/get-started/your-authtoken")
 print("   (Debe empezar con '2o...')")
 NGROK_TOKEN = getpass('   Ingresa tu Ngrok Authtoken: ')
 ngrok.set_auth_token(NGROK_TOKEN)
 
-print("\n✅ Credenciales configuradas")
+print("\nCredenciales configuradas")
 
 # ============================================================================
 # CELDA 4: Cargar modelo RoBERTuito V2
 # ============================================================================
-print("\n🤖 Cargando modelo RoBERTuito V2...")
+print("\nCargando modelo RoBERTuito V2...")
 print("   (Esto puede tomar 1-2 minutos)")
 
 MODEL_ID = "ejerez003/robertuito-guatemala-v2.0"
@@ -67,41 +67,13 @@ try:
         token=HF_TOKEN,
         device=0  # GPU si está disponible, sino CPU
     )
-    print("✅ Modelo cargado exitosamente")
+    print("Modelo cargado exitosamente")
 except Exception as e:
-    print(f"❌ Error cargando modelo: {e}")
+    print(f"Error cargando modelo: {e}")
     print("Verifica que tu token de HF tenga permisos de lectura.")
 
-# Mapping: Español → Inglés
-LABEL_MAPPING = {
-    "positivo": "positive",
-    "negativo": "negative",
-    "neutro": "neutral"
-}
+# ... (omitting unchanged mapping and flask setup code) ...
 
-# ============================================================================
-# CELDA 5: Crear API Flask
-# ============================================================================
-app = Flask(__name__)
-CORS(app)  # Permitir requests desde cualquier origen
-
-@app.route('/health', methods=['GET'])
-def health():
-    """Endpoint para verificar que el servidor está activo"""
-    return jsonify({"status": "ok", "model": MODEL_ID})
-
-@app.route('/analyze', methods=['POST'])
-def analyze():
-    """
-    Endpoint principal para análisis de sentimiento.
-    """
-    try:
-        data = request.get_json()
-        texts = data.get('texts', [])
-        
-        if not texts:
-            return jsonify({"error": "No texts provided"}), 400
-        
         logger.info(f"Procesando {len(texts)} comentarios...")
         
         results = []
@@ -129,14 +101,14 @@ def analyze():
                     "confidence": 0.0
                 })
         
-        logger.info(f"✅ {len(results)} comentarios procesados")
+        logger.info(f"{len(results)} comentarios procesados")
         return jsonify({"results": results})
         
     except Exception as e:
         logger.error(f"Error en /analyze: {e}")
         return jsonify({"error": str(e)}), 500
 
-print("✅ API Flask configurada")
+print("API Flask configurada")
 
 # ============================================================================
 # CELDA 6: Exponer API con ngrok
@@ -148,17 +120,18 @@ ngrok.kill()
 try:
     public_url = ngrok.connect(5000)
     print("\n" + "="*70)
-    print("🌐 API PÚBLICA DISPONIBLE")
+    print("API PÚBLICA DISPONIBLE")
     print("="*70)
     print(f"URL: {public_url.public_url}")
     print(f"Health check: {public_url.public_url}/health")
     print(f"Analyze endpoint: {public_url.public_url}/analyze")
     print("="*70)
-    print("\n⚠️  IMPORTANTE: Copia esta URL y configúrala en la app de Streamlit")
-    print("\n🔄 El servidor se ejecutará hasta que detengas esta celda o Colab se desconecte")
+    print("\nIMPORTANTE: Copia esta URL y configúrala en la app de Streamlit")
+    print("\nEl servidor se ejecutará hasta que detengas esta celda o Colab se desconecte")
     print("="*70 + "\n")
 except Exception as e:
-    print(f"❌ Error iniciando ngrok: {e}")
+    print(f"Error iniciando ngrok: {e}")
+
     print("Verifica que tu Authtoken sea correcto.")
 
 # ============================================================================

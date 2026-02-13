@@ -14,7 +14,7 @@ from components.visualizer import (
 # Configuración de la página
 st.set_page_config(
     page_title="DDI Sentiment Analyzer",
-    page_icon="🤖",
+    page_icon=None,
     layout="wide"
 )
 
@@ -93,9 +93,9 @@ with st.sidebar:
     logo_url = "https://ddilatam.com/wp-content/uploads/2024/08/DDI-LOGO-COLOR-OK-09_0064002e0_2244.png"
     st.image(logo_url, use_column_width=True)
     
-    st.header("⚙️ Configuración")
+    st.header("Configuración")
     
-    st.markdown("### 🌐 URL del API (Colab)")
+    st.markdown("### URL del API (Colab)")
     
     # Instrucciones con estilo personalizado - Mejor contraste
     st.markdown("""
@@ -117,16 +117,16 @@ with st.sidebar:
     )
     
     st.markdown("---")
-    st.markdown("### 📊 Opciones de Análisis")
+    st.markdown("### Opciones de Análisis")
     use_sentiment = st.checkbox("Análisis de Sentimiento V2", value=True, disabled=True)
     
     st.markdown("---")
-    st.markdown("### ℹ️ Información")
+    st.markdown("### Información")
     st.caption("Versión: 2.0.0")
     st.caption("Modelo: accesosddi/Sentimiento2")
 
 # Main content
-st.markdown("### 📂 Cargar Archivo")
+st.markdown("### Cargar Archivo")
 st.markdown("Sube un archivo Excel o CSV con las columnas **`Comentario`** y **`sentiment`** (original)")
 
 uploaded_file = st.file_uploader(
