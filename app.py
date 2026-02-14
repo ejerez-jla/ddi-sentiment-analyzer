@@ -58,16 +58,16 @@ st.markdown(f"""
         }}
         
         /* Barras de Progreso: Teal DDI */
-        .stProgress > div > div > div > div {
+        .stProgress > div > div > div > div {{
             background-color: {ddi_teal} !important;
-        }
+        }}
         
         /* OCULTAR ELEMENTOS DE STREAMLIT (Seguridad Visual) */
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        header {visibility: hidden;}
-        [data-testid="stToolbar"] {visibility: hidden;}
-        .stDeployButton {display:none;}
+        #MainMenu {{visibility: hidden;}}
+        footer {{visibility: hidden;}}
+        header {{visibility: hidden;}}
+        [data-testid="stToolbar"] {{visibility: hidden;}}
+        .stDeployButton {{display:none;}}
     </style>
 """, unsafe_allow_html=True)
 
